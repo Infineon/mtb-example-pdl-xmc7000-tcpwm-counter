@@ -643,6 +643,19 @@
                 </Net>
             </Netlist>
         </Device>
+        <Device mpn="LBEE5KL1YN/CYW43439KUBG">
+            <BlockConfig>
+                <Block location="bt[0].power[0]">
+                    <Personality template="connectivity_bt" version="1.0">
+                        <Param id="hostWakePin" value=""/>
+                        <Param id="hostWakeIrqEvent" value="CYCFG_BT_WAKE_EVENT_ACTIVE_LOW"/>
+                        <Param id="devWakePin" value=""/>
+                        <Param id="devWakePolarity" value="CYCFG_BT_WAKE_EVENT_ACTIVE_LOW"/>
+                    </Personality>
+                </Block>
+            </BlockConfig>
+            <Netlist/>
+        </Device>
     </Devices>
     <ConfiguratorData/>
 </Configuration>

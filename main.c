@@ -7,7 +7,7 @@
 * Related Document: See README.md
 *
 *******************************************************************************
-* Copyright 2022-2023, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2022-2024, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -41,28 +41,34 @@
 
 #include "cy_pdl.h"
 #include "cybsp.h"
-#include "cy_retarget_io.h"
 
 /*******************************************************************************
 * Macros
 ********************************************************************************/
+#define CC0_INTERRUPT_PRIORITY (7u)
 
 /*******************************************************************************
 * Function Prototypes
 ********************************************************************************/
+static void cc0_interrupt_handler_pdl();
 
 /*******************************************************************************
 * Global Variables
 ********************************************************************************/
+cy_stc_sysint_t intrCfg =
+{
+    .intrSrc = ((NvicMux3_IRQn << 16) | TCPWM_COUNTER_IRQ),   /* Interrupt source is tcpwm_0_interrupts_0_IRQn */
+    .intrPriority = CC0_INTERRUPT_PRIORITY                    /* Interrupt priority is 7 */
+};
 
 /*******************************************************************************
 * Function Name: main
 ********************************************************************************
 * Summary:
-* This counter will be triggered to start by PWM output signal, and counter period is
+* This counter will be triggered by software, and counter period is
 * 60000 with 200Khz clock frequency. Enable the CC0 match interrupt, CC0 match value
 * is 50000. It will generate the interrupt when counter up to CC0 match value, then
-* toggle user LED with interrupt generated.
+* toggle user LED with interrupt generated each 0.25s.
 * Parameters:
 *  void
 *
@@ -73,7 +79,6 @@
 int main(void)
 {
     cy_rslt_t result;
-    uint32_t intrMask;
 
     /* Initialize the device and board peripherals */
     result = cybsp_init() ;
@@ -85,44 +90,51 @@ int main(void)
     /* Enable global interrupts */
     __enable_irq();
 
-    /*Initialize the User LED*/
-    Cy_GPIO_Pin_Init(CYBSP_USER_LED1_PORT, CYBSP_USER_LED1_PIN, &CYBSP_USER_LED1_config );
-
-    /*TCPWM PWM Mode initial*/
-    if (CY_TCPWM_SUCCESS != Cy_TCPWM_PWM_Init(TCPWM_PWM_HW, TCPWM_PWM_NUM, &TCPWM_PWM_config))
-    {
-        CY_ASSERT(0);
-    }
-
-    /* Enable the initialized PWM */
-    Cy_TCPWM_PWM_Enable(TCPWM_PWM_HW, TCPWM_PWM_NUM);
-
-    /* Then start the PWM */
-    Cy_TCPWM_TriggerReloadOrIndex_Single(TCPWM_PWM_HW, TCPWM_PWM_NUM);
-
     /*TCPWM Counter Mode initial*/
     if (CY_TCPWM_SUCCESS != Cy_TCPWM_Counter_Init(TCPWM_COUNTER_HW, TCPWM_COUNTER_NUM, &TCPWM_COUNTER_config))
     {
         CY_ASSERT(0);
     }
+
     /* Enable the initialized counter */
     Cy_TCPWM_Counter_Enable(TCPWM_COUNTER_HW, TCPWM_COUNTER_NUM);
 
-    /* Then start the counter, the counter will be trigger by PWM signal */
+    /* Configure and enable Counter CC0 interrupt */
+    Cy_SysInt_Init(&intrCfg, cc0_interrupt_handler_pdl);
+    NVIC_ClearPendingIRQ((IRQn_Type)intrCfg.intrSrc);
+    NVIC_EnableIRQ((IRQn_Type) NvicMux3_IRQn);
+
+    /* Start the counter */
+    Cy_TCPWM_TriggerStart_Single(TCPWM_COUNTER_HW,TCPWM_COUNTER_NUM);
 
     for (;;)
     {
-        /*get the counter CC0 compare interrupt mask*/
-        intrMask = Cy_TCPWM_GetInterruptStatusMasked(TCPWM_COUNTER_HW, TCPWM_COUNTER_NUM);
-        if (intrMask == CY_TCPWM_INT_ON_CC0)
-        {
-            /*toggle user LED1*/
-            Cy_GPIO_Inv(CYBSP_USER_LED1_PORT, CYBSP_USER_LED1_PIN);
-
-            /*clear the counter CC0 compare interrupt*/
-            Cy_TCPWM_ClearInterrupt(TCPWM_COUNTER_HW, TCPWM_COUNTER_NUM, CY_TCPWM_INT_ON_CC0);
-        }
+      /*empty loop*/
     }
 }
+
+/*******************************************************************************
+* Function Name: cc0_Interrupt_handler_pdl
+********************************************************************************
+*
+*  Summary:
+*  Counter cc0 interrupt handler for the PDL example.
+*
+*  Parameters:
+*  None
+*
+*  Return:
+*  None
+*
+**********************************************************************************/
+static void cc0_interrupt_handler_pdl()
+{
+    /*toggle user LED1*/
+    Cy_GPIO_Inv(CYBSP_USER_LED1_PORT, CYBSP_USER_LED1_PIN);
+
+    /*clear the counter CC0 compare interrupt*/
+    Cy_TCPWM_ClearInterrupt(TCPWM_COUNTER_HW, TCPWM_COUNTER_NUM, CY_TCPWM_INT_ON_CC0);
+}
+
 
 /* [] END OF FILE */
